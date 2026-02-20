@@ -20,11 +20,12 @@ export default function GroupDetail() {
   const navigate = useNavigate();
   const [group, setGroup] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [lbLoading, setLbLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     api.get(`/groups/${id}`).then(setGroup).catch(() => navigate('/app/groups'));
-    api.get(`/groups/${id}/leaderboard`).then(setLeaderboard).catch(() => {});
+    api.get(`/groups/${id}/leaderboard`).then(setLeaderboard).catch(() => {}).finally(() => setLbLoading(false));
   }, [id]);
 
   function copyInvite() {
@@ -40,7 +41,32 @@ export default function GroupDetail() {
     navigate('/app/groups');
   }
 
-  if (!group) return <div className="text-center py-8 text-text-muted text-sm md:text-base">Loading...</div>;
+  if (!group) return (
+    <div className="max-w-2xl mx-auto space-y-3 md:space-y-4 animate-pulse">
+      <div className="h-4 w-16 rounded bg-surface-2" />
+      <div className="bg-surface rounded-xl p-4 md:p-5 border border-border">
+        <div className="h-5 w-36 rounded bg-surface-2 mb-2" />
+        <div className="h-3 w-20 rounded bg-surface-2" />
+        <div className="mt-3 flex gap-1.5">
+          <div className="h-6 w-16 rounded-md bg-surface-2" />
+          <div className="h-6 w-16 rounded-md bg-surface-2" />
+        </div>
+      </div>
+      <div className="bg-surface rounded-xl border border-border overflow-hidden">
+        <div className="px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border">
+          <div className="h-4 w-24 rounded bg-surface-2" />
+        </div>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border last:border-0">
+            <div className="w-6 h-5 rounded bg-surface-2" />
+            <div className="w-7 h-7 md:w-9 md:h-9 rounded-md bg-surface-2" />
+            <div className="h-4 w-24 rounded bg-surface-2" />
+            <div className="ml-auto h-4 w-12 rounded bg-surface-2" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const isOwner = group.ownerId === user?.id;
 
@@ -83,7 +109,18 @@ export default function GroupDetail() {
         <h3 className="px-3.5 py-2.5 md:px-4 md:py-3 font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted border-b border-border flex items-center gap-1.5">
           <Trophy size={14} className="text-calories" /> Leaderboard
         </h3>
-        {leaderboard.length === 0 ? (
+        {lbLoading ? (
+          <div className="animate-pulse">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border last:border-0">
+                <div className="w-6 h-5 rounded bg-surface-2" />
+                <div className="w-7 h-7 md:w-9 md:h-9 rounded-md bg-surface-2" />
+                <div className="h-4 w-24 rounded bg-surface-2" />
+                <div className="ml-auto h-4 w-12 rounded bg-surface-2" />
+              </div>
+            ))}
+          </div>
+        ) : leaderboard.length === 0 ? (
           <p className="px-3.5 py-6 text-center text-xs md:text-sm text-text-muted">No points yet. Start logging!</p>
         ) : (
           leaderboard.map((entry, i) => (

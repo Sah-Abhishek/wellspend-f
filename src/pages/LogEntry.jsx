@@ -9,6 +9,7 @@ export default function LogEntry() {
   const [date, setDate] = useState(searchParams.get('date') || new Date().toISOString().split('T')[0]);
   const [log, setLog] = useState(null);
   const [foods, setFoods] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [servings, setServings] = useState(1);
   const [selected, setSelected] = useState([]);
@@ -17,8 +18,8 @@ export default function LogEntry() {
   const [exerciseMins, setExerciseMins] = useState(0);
 
   useEffect(() => {
-    loadLog();
-    api.get('/foods').then(setFoods).catch(() => {});
+    setLoading(true);
+    Promise.all([loadLog(), api.get('/foods').then(setFoods).catch(() => {})]).finally(() => setLoading(false));
   }, [date]);
 
   async function loadLog() {
@@ -92,7 +93,16 @@ export default function LogEntry() {
         </button>
       </div>
 
-      {log && (
+      {loading ? (
+        <div className="grid grid-cols-3 gap-2 md:gap-3 animate-pulse">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-surface rounded-lg p-2.5 md:p-3.5 border border-border text-center">
+              <div className="h-6 w-12 rounded bg-surface-2 mx-auto mb-1" />
+              <div className="h-3 w-14 rounded bg-surface-2 mx-auto" />
+            </div>
+          ))}
+        </div>
+      ) : log && (
         <div className="grid grid-cols-3 gap-2 md:gap-3">
           {[
             { label: 'Protein', value: log.totalProtein, unit: 'g', color: 'text-protein' },

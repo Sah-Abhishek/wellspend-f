@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
-import { ChevronLeft, ChevronRight, Beef, Flame, Wallet, BookOpen, Dumbbell, Loader2, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Beef, Flame, Wallet, BookOpen, Dumbbell, Pencil } from 'lucide-react';
 import FoodIcon from '../components/FoodIcon';
 
 const categories = [
@@ -130,8 +130,23 @@ export default function Calendar() {
       {selectedDate && (
         <div className="mt-3 md:mt-4">
           {loading ? (
-            <div className="flex items-center justify-center py-10 text-text-muted">
-              <Loader2 size={20} className="animate-spin" />
+            <div className="animate-pulse space-y-2.5">
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="h-3 w-36 rounded bg-surface-2" />
+                <div className="h-7 w-14 rounded-lg bg-surface-2" />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-3.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="bg-surface rounded-xl p-3.5 md:p-5 border border-border">
+                    <div className="flex items-center justify-between mb-2.5 md:mb-3">
+                      <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-surface-2" />
+                      <div className="h-3 w-12 rounded bg-surface-2" />
+                    </div>
+                    <div className="h-7 w-14 rounded bg-surface-2 mb-1" />
+                    <div className="h-3 w-10 rounded bg-surface-2" />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <>

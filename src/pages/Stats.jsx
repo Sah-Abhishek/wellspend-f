@@ -19,12 +19,15 @@ export default function Stats() {
   const [range, setRange] = useState('week');
   const [category, setCategory] = useState('totalProtein');
   const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     const today = new Date().toISOString().split('T')[0];
     api.get(`/stats?range=${range}&date=${today}`)
       .then(setData)
-      .catch(() => setData([]));
+      .catch(() => setData([]))
+      .finally(() => setLoading(false));
   }, [range]);
 
   const cat = categories.find(c => c.key === category);
@@ -73,41 +76,66 @@ export default function Stats() {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 md:gap-3">
-        <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
-          <p className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider mb-1">Average</p>
-          <p className="text-xl md:text-2xl font-bold tracking-tight">{avg} <span className="text-xs md:text-sm font-normal text-text-muted">{cat?.unit}</span></p>
+      {loading ? (
+        <div className="animate-pulse space-y-3 md:space-y-4">
+          <div className="grid grid-cols-2 gap-2 md:gap-3">
+            <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
+              <div className="h-3 w-14 rounded bg-surface-2 mb-2" />
+              <div className="h-6 w-20 rounded bg-surface-2" />
+            </div>
+            <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
+              <div className="h-3 w-14 rounded bg-surface-2 mb-2" />
+              <div className="h-6 w-20 rounded bg-surface-2" />
+            </div>
+          </div>
+          <div className="bg-surface rounded-xl p-3.5 md:p-5 border border-border">
+            <div className="h-3 w-28 rounded bg-surface-2 mb-4" />
+            <div className="flex items-end gap-2 h-[220px] pb-6">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className="flex-1 rounded-t bg-surface-2" style={{ height: `${30 + Math.random() * 50}%` }} />
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
-          <p className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider mb-1">Best Day</p>
-          <p className="text-xl md:text-2xl font-bold tracking-tight">{max} <span className="text-xs md:text-sm font-normal text-text-muted">{cat?.unit}</span></p>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 md:gap-3">
+            <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
+              <p className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider mb-1">Average</p>
+              <p className="text-xl md:text-2xl font-bold tracking-tight">{avg} <span className="text-xs md:text-sm font-normal text-text-muted">{cat?.unit}</span></p>
+            </div>
+            <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
+              <p className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider mb-1">Best Day</p>
+              <p className="text-xl md:text-2xl font-bold tracking-tight">{max} <span className="text-xs md:text-sm font-normal text-text-muted">{cat?.unit}</span></p>
+            </div>
+          </div>
 
-      <div className="bg-surface rounded-xl p-3.5 md:p-5 border border-border">
-        <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted mb-4">
-          {range === 'week' ? 'Weekly' : 'Monthly'} Overview
-        </h3>
-        <ResponsiveContainer width="100%" height={220}>
-          {range === 'week' ? (
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1E2A37" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={{ stroke: '#1E2A37' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={false} tickLine={false} />
-              <Tooltip {...tooltipStyle} />
-              <Bar dataKey="value" fill={cat?.color} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          ) : (
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1E2A37" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={{ stroke: '#1E2A37' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={false} tickLine={false} />
-              <Tooltip {...tooltipStyle} />
-              <Line type="monotone" dataKey="value" stroke={cat?.color} strokeWidth={2} dot={{ r: 3, fill: cat?.color }} />
-            </LineChart>
-          )}
-        </ResponsiveContainer>
-      </div>
+          <div className="bg-surface rounded-xl p-3.5 md:p-5 border border-border">
+            <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted mb-4">
+              {range === 'week' ? 'Weekly' : 'Monthly'} Overview
+            </h3>
+            <ResponsiveContainer width="100%" height={220}>
+              {range === 'week' ? (
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1E2A37" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={{ stroke: '#1E2A37' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={false} tickLine={false} />
+                  <Tooltip {...tooltipStyle} />
+                  <Bar dataKey="value" fill={cat?.color} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              ) : (
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1E2A37" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={{ stroke: '#1E2A37' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={false} tickLine={false} />
+                  <Tooltip {...tooltipStyle} />
+                  <Line type="monotone" dataKey="value" stroke={cat?.color} strokeWidth={2} dot={{ r: 3, fill: cat?.color }} />
+                </LineChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
     </div>
   );
 }

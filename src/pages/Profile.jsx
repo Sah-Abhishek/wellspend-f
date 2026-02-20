@@ -9,6 +9,7 @@ import FoodIcon, { foodIconKeys, foodIconMap } from '../components/FoodIcon';
 export default function Profile() {
   const { user, logout } = useAuth();
   const [foods, setFoods] = useState([]);
+  const [foodsLoading, setFoodsLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: '', protein: 0, calories: 0, cost: 0, serving: '1 serving', emoji: 'utensils' });
   const [editId, setEditId] = useState(null);
@@ -17,7 +18,7 @@ export default function Profile() {
   const [pushSupported] = useState(() => isPushSupported());
 
   useEffect(() => {
-    api.get('/foods').then(setFoods).catch(() => {});
+    api.get('/foods').then(setFoods).catch(() => {}).finally(() => setFoodsLoading(false));
     if (pushSupported) {
       isSubscribed().then(setPushEnabled).catch(() => {});
     }
@@ -183,7 +184,19 @@ export default function Profile() {
           </form>
         )}
 
-        {foods.length === 0 && !showAdd ? (
+        {foodsLoading ? (
+          <div className="animate-pulse">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-2.5 px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border last:border-0">
+                <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-surface-2" />
+                <div className="flex-1">
+                  <div className="h-4 w-24 rounded bg-surface-2 mb-1.5" />
+                  <div className="h-3 w-36 rounded bg-surface-2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : foods.length === 0 && !showAdd ? (
           <div className="px-3.5 py-8 text-center">
             <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-2">
               <UtensilsCrossed size={20} className="text-text-muted" />

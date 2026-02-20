@@ -15,10 +15,11 @@ const categories = [
 export default function Dashboard() {
   const { user } = useAuth();
   const [log, setLog] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    api.get(`/logs?date=${today}`).then(setLog).catch(() => {});
+    api.get(`/logs?date=${today}`).then(setLog).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const hour = new Date().getHours();
@@ -32,25 +33,38 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-3.5">
-        {categories.map(({ key, label, unit, color, bg, icon: Icon }) => {
-          const value = log?.[key] || 0;
-          return (
-            <div key={key} className="bg-surface rounded-xl p-3.5 md:p-5 border border-border hover:border-surface-2 transition-all">
+        {loading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-surface rounded-xl p-3.5 md:p-5 border border-border animate-pulse">
               <div className="flex items-center justify-between mb-2.5 md:mb-3">
-                <div className={`w-8 h-8 md:w-9 md:h-9 rounded-lg ${bg} flex items-center justify-center`}>
-                  <Icon size={18} className={color} />
-                </div>
-                <span className={`text-[10px] md:text-xs font-semibold uppercase tracking-wider ${color}`}>
-                  {label}
-                </span>
+                <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-surface-2" />
+                <div className="h-3 w-12 rounded bg-surface-2" />
               </div>
-              <p className={`text-2xl md:text-3xl font-bold tracking-tight ${color}`}>
-                {Math.round(value * 10) / 10}
-              </p>
-              <p className="text-[11px] md:text-sm text-text-muted mt-0.5">{unit} today</p>
+              <div className="h-7 w-16 rounded bg-surface-2 mb-1" />
+              <div className="h-3 w-14 rounded bg-surface-2" />
             </div>
-          );
-        })}
+          ))
+        ) : (
+          categories.map(({ key, label, unit, color, bg, icon: Icon }) => {
+            const value = log?.[key] || 0;
+            return (
+              <div key={key} className="bg-surface rounded-xl p-3.5 md:p-5 border border-border hover:border-surface-2 transition-all">
+                <div className="flex items-center justify-between mb-2.5 md:mb-3">
+                  <div className={`w-8 h-8 md:w-9 md:h-9 rounded-lg ${bg} flex items-center justify-center`}>
+                    <Icon size={18} className={color} />
+                  </div>
+                  <span className={`text-[10px] md:text-xs font-semibold uppercase tracking-wider ${color}`}>
+                    {label}
+                  </span>
+                </div>
+                <p className={`text-2xl md:text-3xl font-bold tracking-tight ${color}`}>
+                  {Math.round(value * 10) / 10}
+                </p>
+                <p className="text-[11px] md:text-sm text-text-muted mt-0.5">{unit} today</p>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <Link

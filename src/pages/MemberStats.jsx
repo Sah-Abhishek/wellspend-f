@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import { ArrowLeft, ChevronLeft, ChevronRight, BarChart3, CalendarDays, Loader2, Beef, Flame, Wallet, BookOpen, Dumbbell } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, BarChart3, CalendarDays, Beef, Flame, Wallet, BookOpen, Dumbbell } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import FoodIcon from '../components/FoodIcon';
 
@@ -42,6 +42,7 @@ export default function MemberStats() {
   const [range, setRange] = useState('week');
   const [category, setCategory] = useState('totalProtein');
   const [data, setData] = useState([]);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Calendar state
   const today = new Date();
@@ -60,10 +61,12 @@ export default function MemberStats() {
   }, [id, userId]);
 
   useEffect(() => {
+    setStatsLoading(true);
     const todayDate = new Date().toISOString().split('T')[0];
     api.get(`/groups/${id}/members/${userId}/stats?range=${range}&date=${todayDate}`)
       .then(setData)
-      .catch(() => setData([]));
+      .catch(() => setData([]))
+      .finally(() => setStatsLoading(false));
   }, [id, userId, range]);
 
   const cat = statsCategories.find(c => c.key === category);
@@ -120,7 +123,11 @@ export default function MemberStats() {
         <ArrowLeft size={14} /> Back to group
       </button>
 
-      <h1 className="text-xl md:text-2xl font-bold tracking-tight">{memberName}&rsquo;s Stats</h1>
+      {memberName ? (
+        <h1 className="text-xl md:text-2xl font-bold tracking-tight">{memberName}&rsquo;s Stats</h1>
+      ) : (
+        <div className="h-7 w-40 rounded bg-surface-2 animate-pulse" />
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1.5">
@@ -175,41 +182,66 @@ export default function MemberStats() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 md:gap-3">
-            <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
-              <p className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider mb-1">Average</p>
-              <p className="text-xl md:text-2xl font-bold tracking-tight">{avg} <span className="text-xs md:text-sm font-normal text-text-muted">{cat?.unit}</span></p>
+          {statsLoading ? (
+            <div className="animate-pulse space-y-3 md:space-y-4">
+              <div className="grid grid-cols-2 gap-2 md:gap-3">
+                <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
+                  <div className="h-3 w-14 rounded bg-surface-2 mb-2" />
+                  <div className="h-6 w-20 rounded bg-surface-2" />
+                </div>
+                <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
+                  <div className="h-3 w-14 rounded bg-surface-2 mb-2" />
+                  <div className="h-6 w-20 rounded bg-surface-2" />
+                </div>
+              </div>
+              <div className="bg-surface rounded-xl p-3.5 md:p-5 border border-border">
+                <div className="h-3 w-28 rounded bg-surface-2 mb-4" />
+                <div className="flex items-end gap-2 h-[220px] pb-6">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <div key={i} className="flex-1 rounded-t bg-surface-2" style={{ height: `${30 + Math.random() * 50}%` }} />
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
-              <p className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider mb-1">Best Day</p>
-              <p className="text-xl md:text-2xl font-bold tracking-tight">{max} <span className="text-xs md:text-sm font-normal text-text-muted">{cat?.unit}</span></p>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2 md:gap-3">
+                <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
+                  <p className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider mb-1">Average</p>
+                  <p className="text-xl md:text-2xl font-bold tracking-tight">{avg} <span className="text-xs md:text-sm font-normal text-text-muted">{cat?.unit}</span></p>
+                </div>
+                <div className="bg-surface rounded-lg p-3 md:p-4 border border-border">
+                  <p className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider mb-1">Best Day</p>
+                  <p className="text-xl md:text-2xl font-bold tracking-tight">{max} <span className="text-xs md:text-sm font-normal text-text-muted">{cat?.unit}</span></p>
+                </div>
+              </div>
 
-          <div className="bg-surface rounded-xl p-3.5 md:p-5 border border-border">
-            <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted mb-4">
-              {range === 'week' ? 'Weekly' : 'Monthly'} Overview
-            </h3>
-            <ResponsiveContainer width="100%" height={220}>
-              {range === 'week' ? (
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1E2A37" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={{ stroke: '#1E2A37' }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={false} tickLine={false} />
-                  <Tooltip {...tooltipStyle} />
-                  <Bar dataKey="value" fill={cat?.color} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              ) : (
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1E2A37" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={{ stroke: '#1E2A37' }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={false} tickLine={false} />
-                  <Tooltip {...tooltipStyle} />
-                  <Line type="monotone" dataKey="value" stroke={cat?.color} strokeWidth={2} dot={{ r: 3, fill: cat?.color }} />
-                </LineChart>
-              )}
-            </ResponsiveContainer>
-          </div>
+              <div className="bg-surface rounded-xl p-3.5 md:p-5 border border-border">
+                <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted mb-4">
+                  {range === 'week' ? 'Weekly' : 'Monthly'} Overview
+                </h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  {range === 'week' ? (
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1E2A37" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={{ stroke: '#1E2A37' }} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={false} tickLine={false} />
+                      <Tooltip {...tooltipStyle} />
+                      <Bar dataKey="value" fill={cat?.color} radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  ) : (
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1E2A37" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={{ stroke: '#1E2A37' }} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: '#6B7A8D' }} axisLine={false} tickLine={false} />
+                      <Tooltip {...tooltipStyle} />
+                      <Line type="monotone" dataKey="value" stroke={cat?.color} strokeWidth={2} dot={{ r: 3, fill: cat?.color }} />
+                    </LineChart>
+                  )}
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -269,8 +301,20 @@ export default function MemberStats() {
           {selectedDate && (
             <div className="mt-3 md:mt-4">
               {calLoading ? (
-                <div className="flex items-center justify-center py-10 text-text-muted">
-                  <Loader2 size={20} className="animate-spin" />
+                <div className="animate-pulse space-y-2.5">
+                  <div className="h-3 w-36 rounded bg-surface-2 mb-2.5" />
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-3.5">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="bg-surface rounded-xl p-3.5 md:p-5 border border-border">
+                        <div className="flex items-center justify-between mb-2.5 md:mb-3">
+                          <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-surface-2" />
+                          <div className="h-3 w-12 rounded bg-surface-2" />
+                        </div>
+                        <div className="h-7 w-14 rounded bg-surface-2 mb-1" />
+                        <div className="h-3 w-10 rounded bg-surface-2" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <>

@@ -5,13 +5,14 @@ import { Plus, Users, Trophy, ChevronRight, Dumbbell } from 'lucide-react';
 
 export default function Groups() {
   const [groups, setGroups] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showJoin, setShowJoin] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/groups').then(setGroups).catch(() => {});
+    api.get('/groups').then(setGroups).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   async function handleJoin(e) {
@@ -64,7 +65,20 @@ export default function Groups() {
         </form>
       )}
 
-      {groups.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2 md:space-y-2.5 animate-pulse">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 bg-surface rounded-xl p-3.5 md:p-4 border border-border">
+              <div className="w-9 h-9 md:w-11 md:h-11 rounded-lg bg-surface-2" />
+              <div className="flex-1">
+                <div className="h-4 w-28 rounded bg-surface-2 mb-1.5" />
+                <div className="h-3 w-16 rounded bg-surface-2" />
+              </div>
+              <div className="h-4 w-10 rounded bg-surface-2" />
+            </div>
+          ))}
+        </div>
+      ) : groups.length === 0 ? (
         <div className="bg-surface rounded-xl p-8 md:p-10 border border-border text-center">
           <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-exercise/10 flex items-center justify-center mx-auto mb-3">
             <Dumbbell size={24} className="text-exercise" />
