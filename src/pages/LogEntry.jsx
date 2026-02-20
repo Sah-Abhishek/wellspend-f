@@ -22,9 +22,8 @@ export default function LogEntry() {
   const [studyMenuOpen, setStudyMenuOpen] = useState(null);
   const [studyDeleteConfirm, setStudyDeleteConfirm] = useState(null);
 
-  // Study session form
-  const [studySubjectId, setStudySubjectId] = useState(null);
-  const [studyHoursInput, setStudyHoursInput] = useState('');
+  // Study session form — map of subjectId → hours string
+  const [selectedStudy, setSelectedStudy] = useState({});
   const [addingStudy, setAddingStudy] = useState(false);
 
   useEffect(() => {
@@ -79,15 +78,34 @@ export default function LogEntry() {
     loadLog();
   }
 
-  async function addStudySession() {
-    if (!log || !studySubjectId || addingStudy) return;
-    const hours = parseFloat(studyHoursInput) || 0;
-    if (hours <= 0) return;
+  function toggleStudySubject(subjectId) {
+    setSelectedStudy(prev => {
+      const next = { ...prev };
+      if (next[subjectId] !== undefined) {
+        delete next[subjectId];
+      } else {
+        next[subjectId] = '';
+      }
+      return next;
+    });
+  }
+
+  function setStudyHours(subjectId, value) {
+    setSelectedStudy(prev => ({ ...prev, [subjectId]: value }));
+  }
+
+  async function addStudySessions() {
+    if (!log || addingStudy) return;
+    const entries = Object.entries(selectedStudy)
+      .map(([subjectId, hrs]) => ({ subjectId, hours: parseFloat(hrs) || 0 }))
+      .filter(e => e.hours > 0);
+    if (entries.length === 0) return;
     setAddingStudy(true);
     try {
-      await api.post(`/logs/${log.id}/study`, { subjectId: studySubjectId, hours });
-      setStudyHoursInput('');
-      setStudySubjectId(null);
+      for (const entry of entries) {
+        await api.post(`/logs/${log.id}/study`, entry);
+      }
+      setSelectedStudy({});
       loadLog();
     } finally {
       setAddingStudy(false);
@@ -345,54 +363,57 @@ export default function LogEntry() {
 
         {subjects.length > 0 ? (
           <div className="p-3.5 md:p-4 space-y-3 bg-surface-2/30">
-            <div className="flex items-center gap-2.5">
-              <span className="text-xs md:text-sm text-text-muted">Hours:</span>
-              <input
-                type="number"
-                step="0.5"
-                min="0.5"
-                value={studyHoursInput}
-                onChange={(e) => setStudyHoursInput(e.target.value)}
-                placeholder="0"
-                className="w-20 px-3 py-1.5 md:py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-study/50 text-center"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 max-h-44 md:max-h-64 overflow-y-auto">
+            <div className="grid grid-cols-2 gap-2">
               {subjects.map(subject => {
-                const isSelected = studySubjectId === subject.id;
+                const isSelected = selectedStudy[subject.id] !== undefined;
                 return (
-                  <button
-                    key={subject.id}
-                    onClick={() => setStudySubjectId(isSelected ? null : subject.id)}
-                    className={`flex items-center gap-2 p-2.5 md:p-3 rounded-lg border transition-all text-left relative ${
-                      isSelected
-                        ? 'border-study bg-study/10'
-                        : 'border-border hover:border-study/40 hover:bg-study/5'
-                    }`}
-                  >
+                  <div key={subject.id} className={`rounded-lg border transition-all ${
+                    isSelected
+                      ? 'border-study bg-study/10'
+                      : 'border-border hover:border-study/40 hover:bg-study/5'
+                  }`}>
+                    <button
+                      onClick={() => toggleStudySubject(subject.id)}
+                      className="flex items-center gap-2 p-2.5 md:p-3 text-left w-full relative"
+                    >
+                      {isSelected && (
+                        <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-study flex items-center justify-center">
+                          <Check size={12} className="text-bg" />
+                        </div>
+                      )}
+                      <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-study/10 flex items-center justify-center text-study shrink-0">
+                        <StudyIcon name={subject.emoji} size={16} />
+                      </div>
+                      <p className="text-sm md:text-base font-medium truncate">{subject.name}</p>
+                    </button>
                     {isSelected && (
-                      <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-study flex items-center justify-center">
-                        <Check size={12} className="text-bg" />
+                      <div className="px-2.5 pb-2.5 md:px-3 md:pb-3">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          value={selectedStudy[subject.id]}
+                          onChange={(e) => setStudyHours(subject.id, e.target.value)}
+                          placeholder="0"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-study/30 bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-study/50 text-center"
+                          autoFocus
+                        />
+                        <p className="text-[10px] md:text-xs text-text-muted text-center mt-1">hours</p>
                       </div>
                     )}
-                    <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-study/10 flex items-center justify-center text-study shrink-0">
-                      <StudyIcon name={subject.emoji} size={16} />
-                    </div>
-                    <p className="text-sm md:text-base font-medium truncate">{subject.name}</p>
-                  </button>
+                  </div>
                 );
               })}
             </div>
 
-            {studySubjectId && (
+            {Object.keys(selectedStudy).length > 0 && (
               <button
-                onClick={addStudySession}
-                disabled={addingStudy || !studyHoursInput}
+                onClick={addStudySessions}
+                disabled={addingStudy || !Object.values(selectedStudy).some(v => parseFloat(v) > 0)}
                 className="w-full py-2.5 bg-study text-bg text-sm md:text-base font-semibold rounded-lg hover:bg-study/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 <Save size={14} />
-                {addingStudy ? 'Adding...' : 'Add Session'}
+                {addingStudy ? 'Adding...' : `Add ${Object.values(selectedStudy).filter(v => parseFloat(v) > 0).length} session${Object.values(selectedStudy).filter(v => parseFloat(v) > 0).length !== 1 ? 's' : ''}`}
               </button>
             )}
           </div>
