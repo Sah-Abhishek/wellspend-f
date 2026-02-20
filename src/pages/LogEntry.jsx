@@ -3,32 +3,43 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { ChevronLeft, ChevronRight, Plus, Minus, Trash2, BookOpen, Dumbbell, Search, Check, Save, MoreVertical, X } from 'lucide-react';
 import FoodIcon from '../components/FoodIcon';
+import StudyIcon from '../components/StudyIcon';
 
 export default function LogEntry() {
   const [searchParams] = useSearchParams();
   const [date, setDate] = useState(searchParams.get('date') || new Date().toISOString().split('T')[0]);
   const [log, setLog] = useState(null);
   const [foods, setFoods] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [servings, setServings] = useState(1);
   const [selected, setSelected] = useState([]);
   const [adding, setAdding] = useState(false);
-  const [studyHours, setStudyHours] = useState(0);
   const [exerciseMins, setExerciseMins] = useState(0);
   const [menuOpen, setMenuOpen] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [studyMenuOpen, setStudyMenuOpen] = useState(null);
+  const [studyDeleteConfirm, setStudyDeleteConfirm] = useState(null);
+
+  // Study session form
+  const [studySubjectId, setStudySubjectId] = useState('');
+  const [studyHoursInput, setStudyHoursInput] = useState(1);
+  const [addingStudy, setAddingStudy] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadLog(), api.get('/foods').then(setFoods).catch(() => {})]).finally(() => setLoading(false));
+    Promise.all([
+      loadLog(),
+      api.get('/foods').then(setFoods).catch(() => {}),
+      api.get('/study-subjects').then(setSubjects).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, [date]);
 
   async function loadLog() {
     try {
       const data = await api.get(`/logs?date=${date}`);
       setLog(data);
-      setStudyHours(data.studyHours || 0);
       setExerciseMins(data.exerciseMins || 0);
     } catch { setLog(null); }
   }
@@ -68,9 +79,27 @@ export default function LogEntry() {
     loadLog();
   }
 
+  async function addStudySession() {
+    if (!log || !studySubjectId || addingStudy) return;
+    setAddingStudy(true);
+    try {
+      await api.post(`/logs/${log.id}/study`, { subjectId: studySubjectId, hours: studyHoursInput });
+      setStudyHoursInput(1);
+      loadLog();
+    } finally {
+      setAddingStudy(false);
+    }
+  }
+
+  async function removeStudyEntry(entryId) {
+    if (!log) return;
+    await api.delete(`/logs/${log.id}/study/${entryId}`);
+    loadLog();
+  }
+
   async function updateActivity() {
     if (!log) return;
-    await api.patch(`/logs/${log.id}`, { studyHours, exerciseMins });
+    await api.patch(`/logs/${log.id}`, { exerciseMins });
     loadLog();
   }
 
@@ -119,6 +148,7 @@ export default function LogEntry() {
         </div>
       )}
 
+      {/* Today's Food */}
       {log?.entries?.length > 0 && (
         <div className="bg-surface rounded-xl border border-border overflow-hidden">
           <h3 className="px-3.5 py-2.5 md:px-4 md:py-3 font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted border-b border-border">Today's Food</h3>
@@ -161,9 +191,10 @@ export default function LogEntry() {
         </div>
       )}
 
+      {/* Food Delete Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setDeleteConfirm(null)}>
-          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-sm space-y-4 animate-modal-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-sm md:text-base">Remove entry?</h3>
               <button onClick={() => setDeleteConfirm(null)} className="p-1 text-text-muted hover:text-text rounded-md transition-colors">
@@ -191,6 +222,7 @@ export default function LogEntry() {
         </div>
       )}
 
+      {/* Add Food */}
       <div className="bg-surface rounded-xl p-3.5 md:p-5 border border-border space-y-3">
         <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted">Add Food</h3>
         <div className="relative">
@@ -262,37 +294,140 @@ export default function LogEntry() {
         )}
       </div>
 
+      {/* Study Sessions */}
+      <div className="bg-surface rounded-xl border border-border overflow-hidden">
+        <h3 className="px-3.5 py-2.5 md:px-4 md:py-3 font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted border-b border-border flex items-center gap-1.5">
+          <BookOpen size={13} /> Study Sessions
+          {log?.studyHours > 0 && (
+            <span className="ml-auto text-study font-bold text-xs md:text-sm normal-case tracking-normal">{Math.round(log.studyHours * 10) / 10}h total</span>
+          )}
+        </h3>
+
+        {log?.studyEntries?.length > 0 && (
+          log.studyEntries.map((entry) => (
+            <div key={entry.id} className="flex items-center justify-between px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border last:border-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-study/10 flex items-center justify-center text-study">
+                  <StudyIcon name={entry.subject?.emoji} size={16} />
+                </div>
+                <div>
+                  <p className="text-sm md:text-base font-medium">{entry.subject?.name}</p>
+                  <p className="text-[11px] md:text-sm text-text-muted">{entry.hours}h</p>
+                </div>
+              </div>
+              <div className="relative">
+                <button
+                  onClick={() => setStudyMenuOpen(studyMenuOpen === entry.id ? null : entry.id)}
+                  className="p-1.5 text-text-muted hover:text-text hover:bg-surface-2 rounded-md transition-colors"
+                >
+                  <MoreVertical size={14} />
+                </button>
+                {studyMenuOpen === entry.id && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setStudyMenuOpen(null)} />
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
+                      <button
+                        onClick={() => { setStudyMenuOpen(null); setStudyDeleteConfirm(entry); }}
+                        className="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm text-spending hover:bg-spending/10 transition-colors whitespace-nowrap"
+                      >
+                        <Trash2 size={13} /> Remove
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+
+        {subjects.length > 0 ? (
+          <div className="p-3.5 md:p-4 space-y-2.5 bg-surface-2/30">
+            <div className="flex gap-2">
+              <select
+                value={studySubjectId}
+                onChange={(e) => setStudySubjectId(e.target.value)}
+                className="flex-1 px-3 py-2 md:py-2.5 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-study/50 appearance-none"
+              >
+                <option value="">Select subject...</option>
+                {subjects.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                step="0.5"
+                min="0.5"
+                value={studyHoursInput}
+                onChange={(e) => setStudyHoursInput(parseFloat(e.target.value) || 0)}
+                className="w-20 px-3 py-2 md:py-2.5 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-study/50 text-center"
+                placeholder="hrs"
+              />
+            </div>
+            <button
+              onClick={addStudySession}
+              disabled={!studySubjectId || addingStudy}
+              className="w-full py-2 bg-study text-bg text-xs md:text-sm font-semibold rounded-lg hover:bg-study/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              <Plus size={14} />
+              {addingStudy ? 'Adding...' : 'Add Session'}
+            </button>
+          </div>
+        ) : (
+          <div className="px-3.5 py-6 text-center">
+            <p className="text-xs md:text-sm text-text-muted">No subjects yet. Add some in Profile!</p>
+          </div>
+        )}
+      </div>
+
+      {/* Study Delete Modal */}
+      {studyDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setStudyDeleteConfirm(null)}>
+          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-sm space-y-4 animate-modal-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm md:text-base">Remove session?</h3>
+              <button onClick={() => setStudyDeleteConfirm(null)} className="p-1 text-text-muted hover:text-text rounded-md transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs md:text-sm text-text-muted">
+              Remove <span className="font-medium text-text">{studyDeleteConfirm.subject?.name}</span> ({studyDeleteConfirm.hours}h) from this log?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setStudyDeleteConfirm(null)}
+                className="flex-1 py-2 text-xs md:text-sm font-medium rounded-lg border border-border text-text-muted hover:bg-surface-2 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { removeStudyEntry(studyDeleteConfirm.id); setStudyDeleteConfirm(null); }}
+                className="flex-1 py-2 text-xs md:text-sm font-semibold rounded-lg bg-spending/10 text-spending hover:bg-spending/20 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Exercise */}
       <div className="bg-surface rounded-xl p-3.5 md:p-5 border border-border space-y-3">
-        <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted">Activity</h3>
-        <div className="grid grid-cols-2 gap-2.5 md:gap-3">
-          <div>
-            <label className="flex items-center gap-1.5 text-xs md:text-sm text-text-muted mb-1.5">
-              <BookOpen size={12} /> Study Hours
-            </label>
-            <input
-              type="number"
-              step="0.5"
-              min="0"
-              value={studyHours}
-              onChange={(e) => setStudyHours(parseFloat(e.target.value) || 0)}
-              onBlur={updateActivity}
-              className="w-full px-3 py-2 md:py-2.5 rounded-lg border border-border bg-surface-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all"
-            />
-          </div>
-          <div>
-            <label className="flex items-center gap-1.5 text-xs md:text-sm text-text-muted mb-1.5">
-              <Dumbbell size={12} /> Exercise (min)
-            </label>
-            <input
-              type="number"
-              step="5"
-              min="0"
-              value={exerciseMins}
-              onChange={(e) => setExerciseMins(parseFloat(e.target.value) || 0)}
-              onBlur={updateActivity}
-              className="w-full px-3 py-2 md:py-2.5 rounded-lg border border-border bg-surface-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all"
-            />
-          </div>
+        <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+          <Dumbbell size={13} /> Exercise
+        </h3>
+        <div>
+          <label className="flex items-center gap-1.5 text-xs md:text-sm text-text-muted mb-1.5">
+            Minutes
+          </label>
+          <input
+            type="number"
+            step="5"
+            min="0"
+            value={exerciseMins}
+            onChange={(e) => setExerciseMins(parseFloat(e.target.value) || 0)}
+            onBlur={updateActivity}
+            className="w-full px-3 py-2 md:py-2.5 rounded-lg border border-border bg-surface-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all"
+          />
         </div>
       </div>
     </div>

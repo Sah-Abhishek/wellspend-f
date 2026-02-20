@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
-import { LogOut, Plus, Trash2, UtensilsCrossed, Save, Bell, BellOff } from 'lucide-react';
+import { LogOut, Plus, Trash2, UtensilsCrossed, Save, Bell, BellOff, BookOpen, MoreVertical, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { isPushSupported, subscribeToPush, unsubscribeFromPush, isSubscribed } from '../utils/pushNotifications';
 import FoodIcon, { foodIconKeys, foodIconMap } from '../components/FoodIcon';
+import StudyIcon, { studyIconKeys, studyIconMap } from '../components/StudyIcon';
 
 export default function Profile() {
   const { user, logout } = useAuth();
@@ -16,9 +17,22 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported] = useState(() => isPushSupported());
+  const [foodMenuOpen, setFoodMenuOpen] = useState(null);
+  const [foodDeleteConfirm, setFoodDeleteConfirm] = useState(null);
+
+  // Study subjects state
+  const [subjects, setSubjects] = useState([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(true);
+  const [showSubjectAdd, setShowSubjectAdd] = useState(false);
+  const [subjectForm, setSubjectForm] = useState({ name: '', emoji: 'book' });
+  const [subjectEditId, setSubjectEditId] = useState(null);
+  const [subjectSaving, setSubjectSaving] = useState(false);
+  const [subjectMenuOpen, setSubjectMenuOpen] = useState(null);
+  const [subjectDeleteConfirm, setSubjectDeleteConfirm] = useState(null);
 
   useEffect(() => {
     api.get('/foods').then(setFoods).catch(() => {}).finally(() => setFoodsLoading(false));
+    api.get('/study-subjects').then(setSubjects).catch(() => {}).finally(() => setSubjectsLoading(false));
     if (pushSupported) {
       isSubscribed().then(setPushEnabled).catch(() => {});
     }
@@ -48,15 +62,53 @@ export default function Profile() {
     }
   }
 
-  async function handleDelete(id) {
+  async function handleDeleteFood(id) {
     await api.delete(`/foods/${id}`);
     setFoods(foods.filter(f => f.id !== id));
+    setFoodDeleteConfirm(null);
   }
 
   function startEdit(food) {
     setForm({ name: food.name, protein: food.protein, calories: food.calories, cost: food.cost, serving: food.serving, emoji: food.emoji });
     setEditId(food.id);
     setShowAdd(true);
+  }
+
+  // Subject handlers
+  function resetSubjectForm() {
+    setSubjectForm({ name: '', emoji: 'book' });
+    setSubjectEditId(null);
+    setShowSubjectAdd(false);
+  }
+
+  async function handleSubjectSave(e) {
+    e.preventDefault();
+    if (subjectSaving) return;
+    setSubjectSaving(true);
+    try {
+      if (subjectEditId) {
+        const updated = await api.put(`/study-subjects/${subjectEditId}`, subjectForm);
+        setSubjects(subjects.map(s => s.id === subjectEditId ? updated : s));
+      } else {
+        const created = await api.post('/study-subjects', subjectForm);
+        setSubjects([...subjects, created]);
+      }
+      resetSubjectForm();
+    } finally {
+      setSubjectSaving(false);
+    }
+  }
+
+  async function handleDeleteSubject(id) {
+    await api.delete(`/study-subjects/${id}`);
+    setSubjects(subjects.filter(s => s.id !== id));
+    setSubjectDeleteConfirm(null);
+  }
+
+  function startSubjectEdit(subject) {
+    setSubjectForm({ name: subject.name, emoji: subject.emoji });
+    setSubjectEditId(subject.id);
+    setShowSubjectAdd(true);
   }
 
   return (
@@ -109,6 +161,7 @@ export default function Profile() {
         </div>
       </div>
 
+      {/* My Foods */}
       <div className="bg-surface rounded-xl border border-border">
         <div className="flex items-center justify-between px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border">
           <h2 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted flex items-center gap-1.5">
@@ -217,13 +270,200 @@ export default function Profile() {
                   </p>
                 </div>
               </button>
-              <button onClick={() => handleDelete(food.id)} className="p-1 text-spending/70 hover:text-spending hover:bg-spending/10 rounded-md transition-colors">
-                <Trash2 size={13} />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setFoodMenuOpen(foodMenuOpen === food.id ? null : food.id)}
+                  className="p-1.5 text-text-muted hover:text-text hover:bg-surface-2 rounded-md transition-colors"
+                >
+                  <MoreVertical size={14} />
+                </button>
+                {foodMenuOpen === food.id && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setFoodMenuOpen(null)} />
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
+                      <button
+                        onClick={() => { setFoodMenuOpen(null); setFoodDeleteConfirm(food); }}
+                        className="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm text-spending hover:bg-spending/10 transition-colors whitespace-nowrap"
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ))
         )}
       </div>
+
+      {/* Food Delete Confirmation Modal */}
+      {foodDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setFoodDeleteConfirm(null)}>
+          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-sm space-y-4 animate-modal-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm md:text-base">Delete food?</h3>
+              <button onClick={() => setFoodDeleteConfirm(null)} className="p-1 text-text-muted hover:text-text rounded-md transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs md:text-sm text-text-muted">
+              Delete <span className="font-medium text-text">{foodDeleteConfirm.name}</span>? This will also remove it from all logged entries.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFoodDeleteConfirm(null)}
+                className="flex-1 py-2 text-xs md:text-sm font-medium rounded-lg border border-border text-text-muted hover:bg-surface-2 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteFood(foodDeleteConfirm.id)}
+                className="flex-1 py-2 text-xs md:text-sm font-semibold rounded-lg bg-spending/10 text-spending hover:bg-spending/20 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* My Subjects */}
+      <div className="bg-surface rounded-xl border border-border">
+        <div className="flex items-center justify-between px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border">
+          <h2 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+            <BookOpen size={13} /> My Subjects
+          </h2>
+          <button
+            onClick={() => { resetSubjectForm(); setShowSubjectAdd(true); }}
+            className="text-primary text-xs md:text-sm font-medium flex items-center gap-1 hover:underline"
+          >
+            <Plus size={12} /> Add
+          </button>
+        </div>
+
+        {showSubjectAdd && (
+          <form onSubmit={handleSubjectSave} className="p-3.5 md:p-4 border-b border-border space-y-2.5 bg-surface-2/50">
+            <div className="flex gap-2">
+              <div className="grid grid-cols-7 gap-1 w-fit">
+                {studyIconKeys.map(key => {
+                  const IconComp = studyIconMap[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSubjectForm({ ...subjectForm, emoji: key })}
+                      className={`w-8 h-8 md:w-9 md:h-9 rounded-lg flex items-center justify-center transition-colors ${
+                        subjectForm.emoji === key ? 'bg-study/20 text-study ring-1 ring-study/50' : 'bg-surface text-text-muted hover:bg-surface-2'
+                      }`}
+                    >
+                      <IconComp size={14} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <input
+              type="text"
+              placeholder="Subject name"
+              value={subjectForm.name}
+              onChange={(e) => setSubjectForm({ ...subjectForm, name: e.target.value })}
+              required
+              className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-study/50 placeholder:text-text-muted/50"
+            />
+            <div className="flex gap-2">
+              <button type="submit" disabled={subjectSaving} className="flex-1 py-2 bg-study text-bg text-xs md:text-sm font-semibold rounded-lg hover:bg-study/90 transition-colors flex items-center justify-center gap-1 disabled:opacity-50">
+                <Save size={12} /> {subjectSaving ? 'Saving...' : subjectEditId ? 'Update' : 'Save'}
+              </button>
+              <button type="button" onClick={resetSubjectForm} className="px-3 py-2 text-xs md:text-sm text-text-muted hover:bg-surface-2 rounded-lg border border-border transition-colors">
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        {subjectsLoading ? (
+          <div className="animate-pulse">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-2.5 px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border last:border-0">
+                <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-surface-2" />
+                <div className="flex-1">
+                  <div className="h-4 w-24 rounded bg-surface-2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : subjects.length === 0 && !showSubjectAdd ? (
+          <div className="px-3.5 py-8 text-center">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-2">
+              <BookOpen size={20} className="text-text-muted" />
+            </div>
+            <p className="text-xs md:text-sm text-text-muted">No subjects yet. Add subjects you want to track!</p>
+          </div>
+        ) : (
+          subjects.map(subject => (
+            <div key={subject.id} className="flex items-center justify-between px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border last:border-0">
+              <button onClick={() => startSubjectEdit(subject)} className="flex items-center gap-2.5 text-left flex-1">
+                <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-study/10 flex items-center justify-center text-study">
+                  <StudyIcon name={subject.emoji} size={16} />
+                </div>
+                <p className="text-sm md:text-base font-medium">{subject.name}</p>
+              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setSubjectMenuOpen(subjectMenuOpen === subject.id ? null : subject.id)}
+                  className="p-1.5 text-text-muted hover:text-text hover:bg-surface-2 rounded-md transition-colors"
+                >
+                  <MoreVertical size={14} />
+                </button>
+                {subjectMenuOpen === subject.id && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setSubjectMenuOpen(null)} />
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
+                      <button
+                        onClick={() => { setSubjectMenuOpen(null); setSubjectDeleteConfirm(subject); }}
+                        className="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm text-spending hover:bg-spending/10 transition-colors whitespace-nowrap"
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Subject Delete Confirmation Modal */}
+      {subjectDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setSubjectDeleteConfirm(null)}>
+          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-sm space-y-4 animate-modal-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm md:text-base">Delete subject?</h3>
+              <button onClick={() => setSubjectDeleteConfirm(null)} className="p-1 text-text-muted hover:text-text rounded-md transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs md:text-sm text-text-muted">
+              Delete <span className="font-medium text-text">{subjectDeleteConfirm.name}</span>? This will also remove all logged study sessions for this subject.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSubjectDeleteConfirm(null)}
+                className="flex-1 py-2 text-xs md:text-sm font-medium rounded-lg border border-border text-text-muted hover:bg-surface-2 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteSubject(subjectDeleteConfirm.id)}
+                className="flex-1 py-2 text-xs md:text-sm font-semibold rounded-lg bg-spending/10 text-spending hover:bg-spending/20 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

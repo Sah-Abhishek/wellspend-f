@@ -185,7 +185,7 @@ export default function GroupDetail() {
 
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowDeleteModal(false)}>
-          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-sm space-y-4 animate-modal-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-sm md:text-base">Delete group?</h3>
               <button onClick={() => setShowDeleteModal(false)} className="p-1 text-text-muted hover:text-text rounded-md transition-colors">
