@@ -1,0 +1,216 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { api } from '../api/client';
+import { LogOut, Plus, Trash2, UtensilsCrossed, Save, Bell, BellOff } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { isPushSupported, subscribeToPush, unsubscribeFromPush, isSubscribed } from '../utils/pushNotifications';
+import FoodIcon, { foodIconKeys, foodIconMap } from '../components/FoodIcon';
+
+export default function Profile() {
+  const { user, logout } = useAuth();
+  const [foods, setFoods] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name: '', protein: 0, calories: 0, cost: 0, serving: '1 serving', emoji: 'utensils' });
+  const [editId, setEditId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushSupported] = useState(() => isPushSupported());
+
+  useEffect(() => {
+    api.get('/foods').then(setFoods).catch(() => {});
+    if (pushSupported) {
+      isSubscribed().then(setPushEnabled).catch(() => {});
+    }
+  }, [pushSupported]);
+
+  function resetForm() {
+    setForm({ name: '', protein: 0, calories: 0, cost: 0, serving: '1 serving', emoji: 'utensils' });
+    setEditId(null);
+    setShowAdd(false);
+  }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (editId) {
+        const updated = await api.put(`/foods/${editId}`, form);
+        setFoods(foods.map(f => f.id === editId ? updated : f));
+      } else {
+        const created = await api.post('/foods', form);
+        setFoods([...foods, created]);
+      }
+      resetForm();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id) {
+    await api.delete(`/foods/${id}`);
+    setFoods(foods.filter(f => f.id !== id));
+  }
+
+  function startEdit(food) {
+    setForm({ name: food.name, protein: food.protein, calories: food.calories, cost: food.cost, serving: food.serving, emoji: food.emoji });
+    setEditId(food.id);
+    setShowAdd(true);
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-3 md:space-y-4">
+      <div className="bg-surface rounded-xl p-4 md:p-5 border border-border">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 md:w-13 md:h-13 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-lg md:text-xl">
+            {user?.name?.[0]?.toUpperCase()}
+          </div>
+          <div>
+            <h1 className="text-lg md:text-xl font-bold tracking-tight">{user?.name}</h1>
+            <p className="text-xs md:text-sm text-text-muted">{user?.email}</p>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          {pushSupported && (
+            <button
+              onClick={async () => {
+                if (pushEnabled) {
+                  await unsubscribeFromPush();
+                  setPushEnabled(false);
+                  toast.success('Notifications disabled');
+                } else {
+                  if (Notification.permission === 'denied') {
+                    toast.error('Notifications blocked. Enable them in browser settings.');
+                    return;
+                  }
+                  const ok = await subscribeToPush();
+                  setPushEnabled(ok);
+                  if (ok) toast.success('Notifications enabled');
+                  else toast.error('Could not enable notifications');
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm rounded-lg transition-colors ${
+                pushEnabled
+                  ? 'text-primary/70 hover:text-primary hover:bg-primary/10'
+                  : 'text-text-muted hover:text-text hover:bg-surface-2'
+              }`}
+            >
+              {pushEnabled ? <Bell size={13} /> : <BellOff size={13} />}
+              {pushEnabled ? 'Notifications on' : 'Notifications off'}
+            </button>
+          )}
+          <button
+            onClick={logout}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-spending/70 hover:text-spending hover:bg-spending/10 rounded-lg transition-colors"
+          >
+            <LogOut size={13} /> Log out
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-surface rounded-xl border border-border">
+        <div className="flex items-center justify-between px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border">
+          <h2 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+            <UtensilsCrossed size={13} /> My Foods
+          </h2>
+          <button
+            onClick={() => { resetForm(); setShowAdd(true); }}
+            className="text-primary text-xs md:text-sm font-medium flex items-center gap-1 hover:underline"
+          >
+            <Plus size={12} /> Add
+          </button>
+        </div>
+
+        {showAdd && (
+          <form onSubmit={handleSave} className="p-3.5 md:p-4 border-b border-border space-y-2.5 bg-surface-2/50">
+            <div className="flex gap-2">
+              <div className="grid grid-cols-6 gap-1 w-fit">
+                {foodIconKeys.map(key => {
+                  const IconComp = foodIconMap[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setForm({ ...form, emoji: key })}
+                      className={`w-8 h-8 md:w-9 md:h-9 rounded-lg flex items-center justify-center transition-colors ${
+                        form.emoji === key ? 'bg-primary/20 text-primary ring-1 ring-primary/50' : 'bg-surface text-text-muted hover:bg-surface-2'
+                      }`}
+                    >
+                      <IconComp size={14} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <input
+              type="text"
+              placeholder="Food name"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              required
+              className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-text-muted/50"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider">Protein (g)</label>
+                <input type="number" step="0.1" value={form.protein} onChange={(e) => setForm({ ...form, protein: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-2.5 py-1.5 md:py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50" />
+              </div>
+              <div>
+                <label className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider">Calories</label>
+                <input type="number" step="1" value={form.calories} onChange={(e) => setForm({ ...form, calories: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-2.5 py-1.5 md:py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50" />
+              </div>
+              <div>
+                <label className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider">Cost (₹)</label>
+                <input type="number" step="0.5" value={form.cost} onChange={(e) => setForm({ ...form, cost: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-2.5 py-1.5 md:py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50" />
+              </div>
+              <div>
+                <label className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider">Serving</label>
+                <input type="text" value={form.serving} onChange={(e) => setForm({ ...form, serving: e.target.value })}
+                  className="w-full px-2.5 py-1.5 md:py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" disabled={saving} className="flex-1 py-2 bg-primary text-bg text-xs md:text-sm font-semibold rounded-lg hover:bg-primary-light transition-colors flex items-center justify-center gap-1 disabled:opacity-50">
+                <Save size={12} /> {saving ? 'Saving...' : editId ? 'Update' : 'Save'}
+              </button>
+              <button type="button" onClick={resetForm} className="px-3 py-2 text-xs md:text-sm text-text-muted hover:bg-surface-2 rounded-lg border border-border transition-colors">
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        {foods.length === 0 && !showAdd ? (
+          <div className="px-3.5 py-8 text-center">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-2">
+              <UtensilsCrossed size={20} className="text-text-muted" />
+            </div>
+            <p className="text-xs md:text-sm text-text-muted">No foods saved yet. Add your first food item!</p>
+          </div>
+        ) : (
+          foods.map(food => (
+            <div key={food.id} className="flex items-center justify-between px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border last:border-0">
+              <button onClick={() => startEdit(food)} className="flex items-center gap-2.5 text-left flex-1">
+                <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-surface-2 flex items-center justify-center text-text-muted">
+                  <FoodIcon name={food.emoji} size={16} />
+                </div>
+                <div>
+                  <p className="text-sm md:text-base font-medium">{food.name}</p>
+                  <p className="text-[11px] md:text-sm text-text-muted">
+                    {food.protein}g · {food.calories} cal · ₹{food.cost} · {food.serving}
+                  </p>
+                </div>
+              </button>
+              <button onClick={() => handleDelete(food.id)} className="p-1 text-spending/70 hover:text-spending hover:bg-spending/10 rounded-md transition-colors">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
