@@ -12,7 +12,7 @@ export default function Profile() {
   const [foods, setFoods] = useState([]);
   const [foodsLoading, setFoodsLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: '', protein: 0, calories: 0, cost: 0, serving: '1 serving', emoji: 'utensils' });
+  const [form, setForm] = useState({ name: '', protein: '', calories: '', cost: '', serving: '1 serving', emoji: 'utensils' });
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -39,7 +39,7 @@ export default function Profile() {
   }, [pushSupported]);
 
   function resetForm() {
-    setForm({ name: '', protein: 0, calories: 0, cost: 0, serving: '1 serving', emoji: 'utensils' });
+    setForm({ name: '', protein: '', calories: '', cost: '', serving: '1 serving', emoji: 'utensils' });
     setEditId(null);
     setShowAdd(false);
   }
@@ -49,11 +49,12 @@ export default function Profile() {
     if (saving) return;
     setSaving(true);
     try {
+      const payload = { ...form, protein: parseFloat(form.protein) || 0, calories: parseFloat(form.calories) || 0, cost: parseFloat(form.cost) || 0 };
       if (editId) {
-        const updated = await api.put(`/foods/${editId}`, form);
+        const updated = await api.put(`/foods/${editId}`, payload);
         setFoods(foods.map(f => f.id === editId ? updated : f));
       } else {
-        const created = await api.post('/foods', form);
+        const created = await api.post('/foods', payload);
         setFoods([...foods, created]);
       }
       resetForm();
@@ -207,17 +208,17 @@ export default function Profile() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider">Protein (g)</label>
-                <input type="number" step="0.1" value={form.protein} onChange={(e) => setForm({ ...form, protein: parseFloat(e.target.value) || 0 })}
+                <input type="number" step="0.1" value={form.protein} placeholder="0" onChange={(e) => setForm({ ...form, protein: e.target.value })}
                   className="w-full px-2.5 py-1.5 md:py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50" />
               </div>
               <div>
                 <label className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider">Calories</label>
-                <input type="number" step="1" value={form.calories} onChange={(e) => setForm({ ...form, calories: parseFloat(e.target.value) || 0 })}
+                <input type="number" step="1" value={form.calories} placeholder="0" onChange={(e) => setForm({ ...form, calories: e.target.value })}
                   className="w-full px-2.5 py-1.5 md:py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50" />
               </div>
               <div>
                 <label className="text-[10px] md:text-xs text-text-muted uppercase tracking-wider">Cost (₹)</label>
-                <input type="number" step="0.5" value={form.cost} onChange={(e) => setForm({ ...form, cost: parseFloat(e.target.value) || 0 })}
+                <input type="number" step="0.5" value={form.cost} placeholder="0" onChange={(e) => setForm({ ...form, cost: e.target.value })}
                   className="w-full px-2.5 py-1.5 md:py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50" />
               </div>
               <div>

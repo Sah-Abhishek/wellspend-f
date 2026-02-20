@@ -16,15 +16,15 @@ export default function LogEntry() {
   const [servings, setServings] = useState(1);
   const [selected, setSelected] = useState([]);
   const [adding, setAdding] = useState(false);
-  const [exerciseMins, setExerciseMins] = useState(0);
+  const [exerciseMins, setExerciseMins] = useState('');
   const [menuOpen, setMenuOpen] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [studyMenuOpen, setStudyMenuOpen] = useState(null);
   const [studyDeleteConfirm, setStudyDeleteConfirm] = useState(null);
 
   // Study session form
-  const [studySubjectId, setStudySubjectId] = useState('');
-  const [studyHoursInput, setStudyHoursInput] = useState(1);
+  const [studySubjectId, setStudySubjectId] = useState(null);
+  const [studyHoursInput, setStudyHoursInput] = useState('');
   const [addingStudy, setAddingStudy] = useState(false);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function LogEntry() {
     try {
       const data = await api.get(`/logs?date=${date}`);
       setLog(data);
-      setExerciseMins(data.exerciseMins || 0);
+      setExerciseMins(data.exerciseMins || '');
     } catch { setLog(null); }
   }
 
@@ -81,10 +81,13 @@ export default function LogEntry() {
 
   async function addStudySession() {
     if (!log || !studySubjectId || addingStudy) return;
+    const hours = parseFloat(studyHoursInput) || 0;
+    if (hours <= 0) return;
     setAddingStudy(true);
     try {
-      await api.post(`/logs/${log.id}/study`, { subjectId: studySubjectId, hours: studyHoursInput });
-      setStudyHoursInput(1);
+      await api.post(`/logs/${log.id}/study`, { subjectId: studySubjectId, hours });
+      setStudyHoursInput('');
+      setStudySubjectId(null);
       loadLog();
     } finally {
       setAddingStudy(false);
@@ -99,7 +102,7 @@ export default function LogEntry() {
 
   async function updateActivity() {
     if (!log) return;
-    await api.patch(`/logs/${log.id}`, { exerciseMins });
+    await api.patch(`/logs/${log.id}`, { exerciseMins: parseFloat(exerciseMins) || 0 });
     loadLog();
   }
 
@@ -341,36 +344,57 @@ export default function LogEntry() {
         )}
 
         {subjects.length > 0 ? (
-          <div className="p-3.5 md:p-4 space-y-2.5 bg-surface-2/30">
-            <div className="flex gap-2">
-              <select
-                value={studySubjectId}
-                onChange={(e) => setStudySubjectId(e.target.value)}
-                className="flex-1 px-3 py-2 md:py-2.5 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-study/50 appearance-none"
-              >
-                <option value="">Select subject...</option>
-                {subjects.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+          <div className="p-3.5 md:p-4 space-y-3 bg-surface-2/30">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs md:text-sm text-text-muted">Hours:</span>
               <input
                 type="number"
                 step="0.5"
                 min="0.5"
                 value={studyHoursInput}
-                onChange={(e) => setStudyHoursInput(parseFloat(e.target.value) || 0)}
-                className="w-20 px-3 py-2 md:py-2.5 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-study/50 text-center"
-                placeholder="hrs"
+                onChange={(e) => setStudyHoursInput(e.target.value)}
+                placeholder="0"
+                className="w-20 px-3 py-1.5 md:py-2 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-study/50 text-center"
               />
             </div>
-            <button
-              onClick={addStudySession}
-              disabled={!studySubjectId || addingStudy}
-              className="w-full py-2 bg-study text-bg text-xs md:text-sm font-semibold rounded-lg hover:bg-study/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-            >
-              <Plus size={14} />
-              {addingStudy ? 'Adding...' : 'Add Session'}
-            </button>
+
+            <div className="grid grid-cols-2 gap-2 max-h-44 md:max-h-64 overflow-y-auto">
+              {subjects.map(subject => {
+                const isSelected = studySubjectId === subject.id;
+                return (
+                  <button
+                    key={subject.id}
+                    onClick={() => setStudySubjectId(isSelected ? null : subject.id)}
+                    className={`flex items-center gap-2 p-2.5 md:p-3 rounded-lg border transition-all text-left relative ${
+                      isSelected
+                        ? 'border-study bg-study/10'
+                        : 'border-border hover:border-study/40 hover:bg-study/5'
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-study flex items-center justify-center">
+                        <Check size={12} className="text-bg" />
+                      </div>
+                    )}
+                    <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-study/10 flex items-center justify-center text-study shrink-0">
+                      <StudyIcon name={subject.emoji} size={16} />
+                    </div>
+                    <p className="text-sm md:text-base font-medium truncate">{subject.name}</p>
+                  </button>
+                );
+              })}
+            </div>
+
+            {studySubjectId && (
+              <button
+                onClick={addStudySession}
+                disabled={addingStudy || !studyHoursInput}
+                className="w-full py-2.5 bg-study text-bg text-sm md:text-base font-semibold rounded-lg hover:bg-study/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <Save size={14} />
+                {addingStudy ? 'Adding...' : 'Add Session'}
+              </button>
+            )}
           </div>
         ) : (
           <div className="px-3.5 py-6 text-center">
@@ -424,8 +448,9 @@ export default function LogEntry() {
             step="5"
             min="0"
             value={exerciseMins}
-            onChange={(e) => setExerciseMins(parseFloat(e.target.value) || 0)}
+            onChange={(e) => setExerciseMins(e.target.value)}
             onBlur={updateActivity}
+            placeholder="0"
             className="w-full px-3 py-2 md:py-2.5 rounded-lg border border-border bg-surface-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all"
           />
         </div>
