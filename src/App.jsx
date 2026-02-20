@@ -10,6 +10,7 @@ import LogEntry from './pages/LogEntry';
 import Groups from './pages/Groups';
 import CreateGroup from './pages/CreateGroup';
 import GroupDetail from './pages/GroupDetail';
+import MemberStats from './pages/MemberStats';
 import JoinGroup from './pages/JoinGroup';
 import Stats from './pages/Stats';
 import Calendar from './pages/Calendar';
@@ -43,6 +44,7 @@ function AppRoutes() {
         <Route path="groups" element={<Groups />} />
         <Route path="groups/new" element={<CreateGroup />} />
         <Route path="groups/:id" element={<GroupDetail />} />
+        <Route path="groups/:id/members/:userId" element={<MemberStats />} />
         <Route path="stats" element={<Stats />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="profile" element={<Profile />} />

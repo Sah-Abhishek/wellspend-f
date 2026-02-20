@@ -87,7 +87,11 @@ export default function GroupDetail() {
           <p className="px-3.5 py-6 text-center text-xs md:text-sm text-text-muted">No points yet. Start logging!</p>
         ) : (
           leaderboard.map((entry, i) => (
-            <div key={entry.userId} className={`flex items-center justify-between px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border last:border-0 ${entry.userId === user?.id ? 'bg-primary/5' : ''}`}>
+            <div
+              key={entry.userId}
+              onClick={() => navigate(`/app/groups/${id}/members/${entry.userId}`)}
+              className={`flex items-center justify-between px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border last:border-0 cursor-pointer hover:bg-surface-2 transition-colors ${entry.userId === user?.id ? 'bg-primary/5' : ''}`}
+            >
               <div className="flex items-center gap-2.5 md:gap-3">
                 <span className="w-6 flex justify-center">
                   {i < 3 ? (
