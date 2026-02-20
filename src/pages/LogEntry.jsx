@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
-import { ChevronLeft, ChevronRight, Plus, Minus, Trash2, BookOpen, Dumbbell, Search, Check, Save } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Minus, Trash2, BookOpen, Dumbbell, Search, Check, Save, MoreVertical, X } from 'lucide-react';
 import FoodIcon from '../components/FoodIcon';
 
 export default function LogEntry() {
@@ -16,6 +16,8 @@ export default function LogEntry() {
   const [adding, setAdding] = useState(false);
   const [studyHours, setStudyHours] = useState(0);
   const [exerciseMins, setExerciseMins] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -133,11 +135,59 @@ export default function LogEntry() {
                   </p>
                 </div>
               </div>
-              <button onClick={() => removeEntry(entry.id)} className="p-1 text-spending/70 hover:text-spending hover:bg-spending/10 rounded-md transition-colors">
-                <Trash2 size={14} />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen(menuOpen === entry.id ? null : entry.id)}
+                  className="p-1.5 text-text-muted hover:text-text hover:bg-surface-2 rounded-md transition-colors"
+                >
+                  <MoreVertical size={14} />
+                </button>
+                {menuOpen === entry.id && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(null)} />
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
+                      <button
+                        onClick={() => { setMenuOpen(null); setDeleteConfirm(entry); }}
+                        className="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm text-spending hover:bg-spending/10 transition-colors whitespace-nowrap"
+                      >
+                        <Trash2 size={13} /> Remove
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setDeleteConfirm(null)}>
+          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm md:text-base">Remove entry?</h3>
+              <button onClick={() => setDeleteConfirm(null)} className="p-1 text-text-muted hover:text-text rounded-md transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs md:text-sm text-text-muted">
+              Remove <span className="font-medium text-text">{deleteConfirm.food?.name}</span> ({deleteConfirm.servings}x) from this log?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2 text-xs md:text-sm font-medium rounded-lg border border-border text-text-muted hover:bg-surface-2 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { removeEntry(deleteConfirm.id); setDeleteConfirm(null); }}
+                className="flex-1 py-2 text-xs md:text-sm font-semibold rounded-lg bg-spending/10 text-spending hover:bg-spending/20 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
