@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Copy, Trophy, Target, Trash2, Check, Medal, Beef, Flame, Wallet, BookOpen, Dumbbell, MoreVertical, X } from 'lucide-react';
+import { ArrowLeft, Copy, Trophy, Target, Trash2, Check, Medal, Beef, Flame, Wallet, BookOpen, Dumbbell, MoreVertical, X, Pencil, Plus } from 'lucide-react';
 
 const categoryLabels = {
   protein: { label: 'Protein', unit: 'g', icon: Beef, color: 'text-protein', bg: 'bg-protein' },
@@ -13,6 +13,14 @@ const categoryLabels = {
 };
 
 const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
+
+const goalCategories = [
+  { value: 'protein', label: 'Protein (g)', icon: Beef, color: 'text-protein' },
+  { value: 'calories', label: 'Calories (kcal)', icon: Flame, color: 'text-calories' },
+  { value: 'spending', label: 'Spending (₹)', icon: Wallet, color: 'text-spending' },
+  { value: 'study', label: 'Study (hrs)', icon: BookOpen, color: 'text-study' },
+  { value: 'exercise', label: 'Exercise (min)', icon: Dumbbell, color: 'text-exercise' },
+];
 
 export default function GroupDetail() {
   const { id } = useParams();
@@ -26,6 +34,11 @@ export default function GroupDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [weeklyProgress, setWeeklyProgress] = useState(null);
   const [wpLoading, setWpLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editGoals, setEditGoals] = useState([]);
+  const [editWeeklyGoals, setEditWeeklyGoals] = useState([]);
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     api.get(`/groups/${id}`).then(setGroup).catch(() => navigate('/app/groups'));
@@ -43,6 +56,38 @@ export default function GroupDetail() {
   async function handleDeleteGroup() {
     await api.delete(`/groups/${id}`);
     navigate('/app/groups');
+  }
+
+  function openEditModal() {
+    setEditName(group.name);
+    setEditGoals((group.goals || []).filter(g => g.type !== 'weekly').map(g => ({ category: g.category, target: g.target })));
+    setEditWeeklyGoals((group.goals || []).filter(g => g.type === 'weekly').map(g => ({ category: g.category, target: g.target })));
+    setShowEditModal(true);
+  }
+
+  function addEditGoal() {
+    const used = editGoals.map(g => g.category);
+    const next = goalCategories.find(c => !used.includes(c.value));
+    if (next) setEditGoals([...editGoals, { category: next.value, target: 0 }]);
+  }
+
+  function addEditWeeklyGoal() {
+    const used = editWeeklyGoals.map(g => g.category);
+    const next = goalCategories.find(c => !used.includes(c.value));
+    if (next) setEditWeeklyGoals([...editWeeklyGoals, { category: next.value, target: 0 }]);
+  }
+
+  async function handleEditSave() {
+    setEditLoading(true);
+    try {
+      const updated = await api.put(`/groups/${id}`, { name: editName, goals: editGoals, weeklyGoals: editWeeklyGoals });
+      setGroup(updated);
+      setShowEditModal(false);
+      api.get(`/groups/${id}/weekly-progress`).then(setWeeklyProgress).catch(() => {});
+    } catch {
+    } finally {
+      setEditLoading(false);
+    }
   }
 
   function getRank(index) {
@@ -206,7 +251,13 @@ export default function GroupDetail() {
       </div>
 
       {isOwner && (
-        <div className="relative w-fit">
+        <div className="relative w-fit flex items-center gap-1.5">
+          <button
+            onClick={openEditModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-text-muted hover:text-text hover:bg-surface-2 rounded-lg transition-colors"
+          >
+            <Pencil size={14} /> Edit
+          </button>
           <button
             onClick={() => setShowMenu(!showMenu)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-text-muted hover:text-text hover:bg-surface-2 rounded-lg transition-colors"
@@ -226,6 +277,126 @@ export default function GroupDetail() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowEditModal(false)}>
+          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-md space-y-4 animate-modal-in max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm md:text-base">Edit Group</h3>
+              <button onClick={() => setShowEditModal(false)} className="p-1 text-text-muted hover:text-text rounded-md transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs md:text-sm font-medium text-text-muted uppercase tracking-wider">Group Name</label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all"
+              />
+            </div>
+
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted">Daily Goals</h4>
+                {editGoals.length < 5 && (
+                  <button type="button" onClick={addEditGoal} className="text-primary text-xs md:text-sm font-medium flex items-center gap-1 hover:underline">
+                    <Plus size={12} /> Add
+                  </button>
+                )}
+              </div>
+              {editGoals.map((goal, i) => {
+                const cat = goalCategories.find(c => c.value === goal.category);
+                const CatIcon = cat?.icon;
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center">
+                      {CatIcon && <CatIcon size={16} className={cat.color} />}
+                    </div>
+                    <select
+                      value={goal.category}
+                      onChange={(e) => { const u = [...editGoals]; u[i] = { ...u[i], category: e.target.value }; setEditGoals(u); }}
+                      className="flex-1 px-2.5 py-2 rounded-lg border border-border bg-surface-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50 text-text"
+                    >
+                      {goalCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                    <input
+                      type="number"
+                      value={goal.target}
+                      onChange={(e) => { const u = [...editGoals]; u[i] = { ...u[i], target: parseFloat(e.target.value) || 0 }; setEditGoals(u); }}
+                      className="w-20 md:w-24 px-2.5 py-2 rounded-lg border border-border bg-surface-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    />
+                    {editGoals.length > 1 && (
+                      <button type="button" onClick={() => setEditGoals(editGoals.filter((_, idx) => idx !== i))} className="p-1 text-spending/70 hover:text-spending hover:bg-spending/10 rounded-md transition-colors">
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted">Weekly Goals</h4>
+                {editWeeklyGoals.length < 5 && (
+                  <button type="button" onClick={addEditWeeklyGoal} className="text-primary text-xs md:text-sm font-medium flex items-center gap-1 hover:underline">
+                    <Plus size={12} /> Add
+                  </button>
+                )}
+              </div>
+              {editWeeklyGoals.length === 0 && (
+                <p className="text-xs text-text-muted">No weekly goals. Add one to track cumulative targets.</p>
+              )}
+              {editWeeklyGoals.map((goal, i) => {
+                const cat = goalCategories.find(c => c.value === goal.category);
+                const CatIcon = cat?.icon;
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center">
+                      {CatIcon && <CatIcon size={16} className={cat.color} />}
+                    </div>
+                    <select
+                      value={goal.category}
+                      onChange={(e) => { const u = [...editWeeklyGoals]; u[i] = { ...u[i], category: e.target.value }; setEditWeeklyGoals(u); }}
+                      className="flex-1 px-2.5 py-2 rounded-lg border border-border bg-surface-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50 text-text"
+                    >
+                      {goalCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                    <input
+                      type="number"
+                      value={goal.target}
+                      onChange={(e) => { const u = [...editWeeklyGoals]; u[i] = { ...u[i], target: parseFloat(e.target.value) || 0 }; setEditWeeklyGoals(u); }}
+                      className="w-20 md:w-24 px-2.5 py-2 rounded-lg border border-border bg-surface-2 text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    />
+                    <button type="button" onClick={() => setEditWeeklyGoals(editWeeklyGoals.filter((_, idx) => idx !== i))} className="p-1 text-spending/70 hover:text-spending hover:bg-spending/10 rounded-md transition-colors">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="flex-1 py-2 text-xs md:text-sm font-medium rounded-lg border border-border text-text-muted hover:bg-surface-2 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditSave}
+                disabled={editLoading || !editName.trim()}
+                className="flex-1 py-2 text-xs md:text-sm font-semibold rounded-lg bg-primary text-bg hover:bg-primary-light transition-colors disabled:opacity-50"
+              >
+                {editLoading ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
