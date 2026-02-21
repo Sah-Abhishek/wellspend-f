@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
-import { ChevronLeft, ChevronRight, Plus, Minus, Trash2, BookOpen, Dumbbell, Search, Check, Save, MoreVertical, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Minus, Trash2, BookOpen, Dumbbell, Search, Check, Save, MoreVertical, X, Wallet } from 'lucide-react';
 import FoodIcon from '../components/FoodIcon';
 import StudyIcon from '../components/StudyIcon';
 
@@ -25,6 +25,13 @@ export default function LogEntry() {
   // Study session form — map of subjectId → hours string
   const [selectedStudy, setSelectedStudy] = useState({});
   const [addingStudy, setAddingStudy] = useState(false);
+
+  // Spending entries
+  const [spendingDesc, setSpendingDesc] = useState('');
+  const [spendingAmount, setSpendingAmount] = useState('');
+  const [addingSpending, setAddingSpending] = useState(false);
+  const [spendingMenuOpen, setSpendingMenuOpen] = useState(null);
+  const [spendingDeleteConfirm, setSpendingDeleteConfirm] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -127,6 +134,28 @@ export default function LogEntry() {
   async function removeStudyEntry(entryId) {
     if (!log) return;
     await api.delete(`/logs/${log.id}/study/${entryId}`);
+    loadLog();
+  }
+
+  async function addSpending() {
+    if (!log || addingSpending || !spendingDesc.trim() || !spendingAmount) return;
+    setAddingSpending(true);
+    try {
+      await api.post(`/logs/${log.id}/spending`, {
+        description: spendingDesc.trim(),
+        amount: parseFloat(spendingAmount) || 0,
+      });
+      setSpendingDesc('');
+      setSpendingAmount('');
+      loadLog();
+    } finally {
+      setAddingSpending(false);
+    }
+  }
+
+  async function removeSpendingEntry(entryId) {
+    if (!log) return;
+    await api.delete(`/logs/${log.id}/spending/${entryId}`);
     loadLog();
   }
 
@@ -479,6 +508,116 @@ export default function LogEntry() {
               </button>
               <button
                 onClick={() => { removeStudyEntry(studyDeleteConfirm.id); setStudyDeleteConfirm(null); }}
+                className="flex-1 py-2 text-xs md:text-sm font-semibold rounded-lg bg-spending/10 text-spending hover:bg-spending/20 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Spending */}
+      <div className="bg-surface rounded-xl border border-border overflow-hidden">
+        <h3 className="px-3.5 py-2.5 md:px-4 md:py-3 font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted border-b border-border flex items-center gap-1.5">
+          <Wallet size={13} /> Spending
+          {log?.spendingEntries?.length > 0 && (
+            <span className="ml-auto text-spending font-bold text-xs md:text-sm normal-case tracking-normal">
+              ₹{Math.round(log.spendingEntries.reduce((s, e) => s + e.amount, 0) * 10) / 10}
+            </span>
+          )}
+        </h3>
+
+        {log?.spendingEntries?.map((entry) => (
+          <div key={entry.id} className="flex items-center justify-between px-3.5 py-2.5 md:px-4 md:py-3 border-b border-border last:border-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-spending/10 flex items-center justify-center text-spending">
+                <Wallet size={16} />
+              </div>
+              <div>
+                <p className="text-sm md:text-base font-medium">{entry.description}</p>
+                <p className="text-[11px] md:text-sm text-text-muted">₹{Math.round(entry.amount * 10) / 10}</p>
+              </div>
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setSpendingMenuOpen(spendingMenuOpen === entry.id ? null : entry.id)}
+                className="p-1.5 text-text-muted hover:text-text hover:bg-surface-2 rounded-md transition-colors"
+              >
+                <MoreVertical size={14} />
+              </button>
+              {spendingMenuOpen === entry.id && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setSpendingMenuOpen(null)} />
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
+                    <button
+                      onClick={() => { setSpendingMenuOpen(null); setSpendingDeleteConfirm(entry); }}
+                      className="flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm text-spending hover:bg-spending/10 transition-colors whitespace-nowrap"
+                    >
+                      <Trash2 size={13} /> Remove
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+
+        <div className="p-3.5 md:p-4 space-y-2.5 bg-surface-2/30">
+          <input
+            type="text"
+            placeholder="What did you spend on?"
+            value={spendingDesc}
+            onChange={(e) => setSpendingDesc(e.target.value)}
+            className="w-full px-3 py-2 md:py-2.5 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-spending/50 focus:border-spending/50 transition-all placeholder:text-text-muted/50"
+          />
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">₹</span>
+            <input
+              type="number"
+              step="1"
+              min="0"
+              placeholder="0"
+              value={spendingAmount}
+              onChange={(e) => setSpendingAmount(e.target.value)}
+              className="w-full pl-7 pr-3 py-2 md:py-2.5 rounded-lg border border-border bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-spending/50 focus:border-spending/50 transition-all placeholder:text-text-muted/50"
+            />
+          </div>
+          {spendingDesc.trim() && spendingAmount && parseFloat(spendingAmount) > 0 && (
+            <button
+              onClick={addSpending}
+              disabled={addingSpending}
+              className="w-full py-2.5 bg-spending text-bg text-sm md:text-base font-semibold rounded-lg hover:bg-spending/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              <Plus size={14} />
+              {addingSpending ? 'Adding...' : 'Add'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Spending Delete Modal */}
+      {spendingDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setSpendingDeleteConfirm(null)}>
+          <div className="bg-surface rounded-xl border border-border p-5 w-full max-w-sm space-y-4 animate-modal-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm md:text-base">Remove spending?</h3>
+              <button onClick={() => setSpendingDeleteConfirm(null)} className="p-1 text-text-muted hover:text-text rounded-md transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs md:text-sm text-text-muted">
+              Remove <span className="font-medium text-text">{spendingDeleteConfirm.description}</span> (₹{Math.round(spendingDeleteConfirm.amount * 10) / 10}) from this log?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSpendingDeleteConfirm(null)}
+                className="flex-1 py-2 text-xs md:text-sm font-medium rounded-lg border border-border text-text-muted hover:bg-surface-2 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { removeSpendingEntry(spendingDeleteConfirm.id); setSpendingDeleteConfirm(null); }}
                 className="flex-1 py-2 text-xs md:text-sm font-semibold rounded-lg bg-spending/10 text-spending hover:bg-spending/20 transition-colors"
               >
                 Remove
