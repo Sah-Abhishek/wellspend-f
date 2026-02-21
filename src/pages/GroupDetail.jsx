@@ -5,11 +5,11 @@ import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Copy, Trophy, Target, Trash2, Check, Medal, Beef, Flame, Wallet, BookOpen, Dumbbell, MoreVertical, X } from 'lucide-react';
 
 const categoryLabels = {
-  protein: { label: 'Protein', unit: 'g', icon: Beef, color: 'text-protein' },
-  calories: { label: 'Calories', unit: 'kcal', icon: Flame, color: 'text-calories' },
-  spending: { label: 'Spending', unit: '₹', icon: Wallet, color: 'text-spending' },
-  study: { label: 'Study', unit: 'hrs', icon: BookOpen, color: 'text-study' },
-  exercise: { label: 'Exercise', unit: 'min', icon: Dumbbell, color: 'text-exercise' },
+  protein: { label: 'Protein', unit: 'g', icon: Beef, color: 'text-protein', bg: 'bg-protein' },
+  calories: { label: 'Calories', unit: 'kcal', icon: Flame, color: 'text-calories', bg: 'bg-calories' },
+  spending: { label: 'Spending', unit: '₹', icon: Wallet, color: 'text-spending', bg: 'bg-spending' },
+  study: { label: 'Study', unit: 'hrs', icon: BookOpen, color: 'text-study', bg: 'bg-study' },
+  exercise: { label: 'Exercise', unit: 'min', icon: Dumbbell, color: 'text-exercise', bg: 'bg-exercise' },
 };
 
 const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
@@ -24,10 +24,13 @@ export default function GroupDetail() {
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [weeklyProgress, setWeeklyProgress] = useState(null);
+  const [wpLoading, setWpLoading] = useState(true);
 
   useEffect(() => {
     api.get(`/groups/${id}`).then(setGroup).catch(() => navigate('/app/groups'));
     api.get(`/groups/${id}/leaderboard`).then(setLeaderboard).catch(() => {}).finally(() => setLbLoading(false));
+    api.get(`/groups/${id}/weekly-progress`).then(setWeeklyProgress).catch(() => {}).finally(() => setWpLoading(false));
   }, [id]);
 
   function copyInvite() {
@@ -100,7 +103,7 @@ export default function GroupDetail() {
         </div>
 
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {group.goals?.map(goal => {
+          {group.goals?.filter(g => g.type !== 'weekly').map(goal => {
             const cat = categoryLabels[goal.category] || {};
             const GoalIcon = cat.icon;
             return (
@@ -112,6 +115,49 @@ export default function GroupDetail() {
           })}
         </div>
       </div>
+
+      {wpLoading ? (
+        <div className="bg-surface rounded-xl p-3.5 md:p-5 border border-border animate-pulse space-y-3">
+          <div className="h-4 w-32 rounded bg-surface-2" />
+          <div className="space-y-2">
+            <div className="h-3 w-full rounded bg-surface-2" />
+            <div className="h-3 w-3/4 rounded bg-surface-2" />
+          </div>
+        </div>
+      ) : weeklyProgress && weeklyProgress.length > 0 && (
+        <div className="space-y-2.5">
+          <h3 className="font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+            <Target size={14} className="text-primary" /> Weekly Progress
+          </h3>
+          {weeklyProgress.map(wp => {
+            const cat = categoryLabels[wp.category] || {};
+            const GoalIcon = cat.icon;
+            return (
+              <div key={wp.goalId} className="bg-surface rounded-xl p-3.5 md:p-4 border border-border space-y-2.5">
+                <div className="flex items-center gap-2 text-xs md:text-sm text-text-muted">
+                  {GoalIcon && <GoalIcon size={14} className={cat.color} />}
+                  <span className="font-medium">{cat.label}</span>
+                  <span>· {wp.target} {cat.unit}</span>
+                </div>
+                <div className="space-y-2">
+                  {wp.members.map(m => (
+                    <div key={m.userId} className="flex items-center gap-2.5">
+                      <span className="text-xs md:text-sm w-20 md:w-24 truncate text-text-muted">{m.userName}</span>
+                      <div className="flex-1 h-2 rounded-full bg-surface-2 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${cat.bg}`}
+                          style={{ width: `${m.percent}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium w-10 text-right text-text-muted">{m.percent}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="bg-surface rounded-xl border border-border overflow-hidden">
         <h3 className="px-3.5 py-2.5 md:px-4 md:py-3 font-semibold text-xs md:text-sm uppercase tracking-wider text-text-muted border-b border-border flex items-center gap-1.5">
