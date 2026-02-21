@@ -50,11 +50,17 @@ export default function LogEntry() {
   }
 
   function toggleFood(foodId) {
-    setSelected(prev =>
-      prev.some(s => s.foodId === foodId)
-        ? prev.filter(s => s.foodId !== foodId)
-        : [...prev, { foodId, servings }]
-    );
+    setSelected(prev => {
+      if (prev.some(s => s.foodId === foodId)) {
+        return prev.filter(s => s.foodId !== foodId);
+      }
+      const food = foods.find(f => f.id === foodId);
+      return [...prev, { foodId, servings, cost: String(food?.cost ?? 0) }];
+    });
+  }
+
+  function setSelectedCost(foodId, value) {
+    setSelected(prev => prev.map(s => s.foodId === foodId ? { ...s, cost: value } : s));
   }
 
   async function addSelected() {
@@ -62,7 +68,13 @@ export default function LogEntry() {
     setAdding(true);
     try {
       for (const item of selected) {
-        await api.post(`/logs/${log.id}/food`, item);
+        const food = foods.find(f => f.id === item.foodId);
+        const costNum = parseFloat(item.cost);
+        const payload = { foodId: item.foodId, servings: item.servings };
+        if (!isNaN(costNum) && food && costNum !== food.cost) {
+          payload.cost = costNum;
+        }
+        await api.post(`/logs/${log.id}/food`, payload);
       }
       setSelected([]);
       setServings(1);
@@ -182,7 +194,7 @@ export default function LogEntry() {
                 <div>
                   <p className="text-sm md:text-base font-medium">{entry.food.name}</p>
                   <p className="text-[11px] md:text-sm text-text-muted">
-                    {entry.servings}x {entry.food.serving} · {Math.round(entry.food.protein * entry.servings)}g · {Math.round(entry.food.calories * entry.servings)} cal
+                    {entry.servings}x {entry.food.serving} · {Math.round(entry.food.protein * entry.servings)}g · {Math.round(entry.food.calories * entry.servings)} cal · ₹{Math.round((entry.cost ?? entry.food.cost) * entry.servings * 10) / 10}
                   </p>
                 </div>
               </div>
@@ -271,29 +283,50 @@ export default function LogEntry() {
         <div className="grid grid-cols-2 gap-2 max-h-44 md:max-h-64 overflow-y-auto">
           {filteredFoods.map(food => {
             const isSelected = selected.some(s => s.foodId === food.id);
+            const sel = selected.find(s => s.foodId === food.id);
             return (
-              <button
+              <div
                 key={food.id}
-                onClick={() => toggleFood(food.id)}
-                className={`flex items-center gap-2 p-2.5 md:p-3 rounded-lg border transition-all text-left relative ${
+                className={`rounded-lg border transition-all ${
                   isSelected
                     ? 'border-primary bg-primary/10'
                     : 'border-border hover:border-primary/40 hover:bg-primary/5'
                 }`}
               >
-                {isSelected && (
-                  <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                    <Check size={12} className="text-bg" />
+                <button
+                  onClick={() => toggleFood(food.id)}
+                  className="flex items-center gap-2 p-2.5 md:p-3 text-left relative w-full"
+                >
+                  {isSelected && (
+                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                      <Check size={12} className="text-bg" />
+                    </div>
+                  )}
+                  <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-surface-2 flex items-center justify-center text-text-muted shrink-0">
+                    <FoodIcon name={food.emoji} size={16} />
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-sm md:text-base font-medium truncate">{food.name}</p>
+                    <p className="text-[11px] md:text-sm text-text-muted">{food.protein}g · {food.calories} cal</p>
+                  </div>
+                </button>
+                {isSelected && sel && (
+                  <div className="px-2.5 pb-2.5 md:px-3 md:pb-3">
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-text-muted">₹</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={sel.cost}
+                        onChange={(e) => setSelectedCost(food.id, e.target.value)}
+                        className="w-full pl-6 pr-2.5 py-1.5 rounded-lg border border-primary/30 bg-surface text-sm md:text-base focus:outline-none focus:ring-1 focus:ring-primary/50 text-center"
+                      />
+                    </div>
+                    <p className="text-[10px] md:text-xs text-text-muted text-center mt-1">price per serving</p>
                   </div>
                 )}
-                <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-surface-2 flex items-center justify-center text-text-muted shrink-0">
-                  <FoodIcon name={food.emoji} size={16} />
-                </div>
-                <div className="overflow-hidden">
-                  <p className="text-sm md:text-base font-medium truncate">{food.name}</p>
-                  <p className="text-[11px] md:text-sm text-text-muted">{food.protein}g · {food.calories} cal</p>
-                </div>
-              </button>
+              </div>
             );
           })}
           {filteredFoods.length === 0 && (
